@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/mennymendoza/sshh/internal/protocol"
 )
 
-func Run(addr, sender, room, keyPath string) error {
+func Run(addr, sender, room, keyPath string, asJSON bool) error {
 	priv, err := cryptox.LoadPrivateKey(keyPath)
 	if err != nil {
 		return fmt.Errorf("load private key: %w", err)
@@ -50,7 +51,7 @@ func Run(addr, sender, room, keyPath string) error {
 		}
 		switch msg.Type {
 		case protocol.MsgHistoryResult:
-			return printHistory(priv, msg, sender)
+			return printHistory(priv, msg, sender, asJSON)
 		case protocol.MsgError:
 			return fmt.Errorf("server error: %s", msg.Error)
 		}
@@ -68,7 +69,13 @@ func writeMessage(channel ssh.Channel, msg protocol.ClientMessage) error {
 	return err
 }
 
-func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string) error {
+type decryptedEntry struct {
+	Sender    string    `json:"sender"`
+	Body      string    `json:"body"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string, asJSON bool) error {
 	entries := msg.Messages
 	if sender != "" {
 		filtered := entries[:0]
@@ -80,7 +87,7 @@ func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string) err
 		entries = filtered
 	}
 
-	if len(entries) == 0 {
+	if !asJSON && len(entries) == 0 {
 		if sender != "" {
 			fmt.Fprintf(os.Stdout, "no messages from %s in %s\n", sender, msg.Room)
 		} else {
@@ -88,6 +95,8 @@ func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string) err
 		}
 		return nil
 	}
+
+	decrypted := make([]decryptedEntry, 0, len(entries))
 	for _, entry := range entries {
 		ciphertext, err := base64.StdEncoding.DecodeString(entry.Body)
 		if err != nil {
@@ -97,7 +106,17 @@ func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string) err
 		if err != nil {
 			return fmt.Errorf("decrypt message from %s: %w", entry.Sender, err)
 		}
-		fmt.Fprintf(os.Stdout, "[%s] %s: %s\n", entry.CreatedAt.Format("2006-01-02 15:04:05"), entry.Sender, plaintext)
+		decrypted = append(decrypted, decryptedEntry{Sender: entry.Sender, Body: string(plaintext), CreatedAt: entry.CreatedAt})
+	}
+
+	if asJSON {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(decrypted)
+	}
+
+	for _, entry := range decrypted {
+		fmt.Fprintf(os.Stdout, "[%s] %s: %s\n", entry.CreatedAt.Format("2006-01-02 15:04:05"), entry.Sender, entry.Body)
 	}
 	return nil
 }

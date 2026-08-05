@@ -12,13 +12,14 @@ func newHistoryCmd() *cobra.Command {
 		user    string
 		room    string
 		keyPath string
+		asJSON  bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "history",
 		Short: "Fetch and decrypt a room's stored message history",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return historyclient.Run(addr, user, room, keyPath)
+			return historyclient.Run(addr, user, room, keyPath, asJSON)
 		},
 	}
 
@@ -26,6 +27,7 @@ func newHistoryCmd() *cobra.Command {
 	cmd.Flags().StringVar(&user, "user", "", "only show messages from this user (optional)")
 	cmd.Flags().StringVar(&room, "room", "general", "room to fetch history for")
 	cmd.Flags().StringVar(&keyPath, "key", "", "path to the X25519 private key PEM file used to decrypt history (required)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output messages as indented JSON")
 	cmd.MarkFlagRequired("key")
 
 	return cmd
