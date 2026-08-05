@@ -5,28 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/mennymendoza/sshh/internal/protocol"
 )
-
-type outgoingMessage struct {
-	Type string `json:"type"`
-	Room string `json:"room,omitempty"`
-	Body string `json:"body,omitempty"`
-}
-
-type incomingMessage struct {
-	Type      string    `json:"type"`
-	Room      string    `json:"room,omitempty"`
-	Sender    string    `json:"sender,omitempty"`
-	Body      string    `json:"body,omitempty"`
-	CreatedAt time.Time `json:"created_at,omitempty"`
-	Rooms     []string  `json:"rooms,omitempty"`
-	Error     string    `json:"error,omitempty"`
-}
 
 func Run(addr, user, room string) error {
 	config := &ssh.ClientConfig{
@@ -41,7 +26,7 @@ func Run(addr, user, room string) error {
 	}
 	defer client.Close()
 
-	channel, requests, err := client.OpenChannel("chat", nil)
+	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
 	if err != nil {
 		return fmt.Errorf("open chat channel: %w", err)
 	}
@@ -52,7 +37,7 @@ func Run(addr, user, room string) error {
 
 	go readLoop(channel, p)
 
-	writeMessage(channel, outgoingMessage{Type: "join", Room: room})
+	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: room})
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)
@@ -60,7 +45,7 @@ func Run(addr, user, room string) error {
 	return nil
 }
 
-func writeMessage(channel ssh.Channel, msg outgoingMessage) {
+func writeMessage(channel ssh.Channel, msg protocol.ClientMessage) {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return
@@ -72,7 +57,7 @@ func writeMessage(channel ssh.Channel, msg outgoingMessage) {
 func readLoop(channel ssh.Channel, p *tea.Program) {
 	scanner := bufio.NewScanner(channel)
 	for scanner.Scan() {
-		var msg incomingMessage
+		var msg protocol.ServerMessage
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
 			p.Send(lineMsg(fmt.Sprintf("(unparseable line: %s)", scanner.Text())))
 			continue
@@ -82,15 +67,15 @@ func readLoop(channel ssh.Channel, p *tea.Program) {
 	p.Send(lineMsg("(disconnected)"))
 }
 
-func formatIncoming(msg incomingMessage) lineMsg {
+func formatIncoming(msg protocol.ServerMessage) lineMsg {
 	switch msg.Type {
-	case "message":
+	case protocol.MsgMessage:
 		return lineMsg(fmt.Sprintf("[%s] %s: %s", msg.Room, msg.Sender, msg.Body))
-	case "rooms":
+	case protocol.MsgRooms:
 		return lineMsg(fmt.Sprintf("rooms: %s", strings.Join(msg.Rooms, ", ")))
-	case "error":
+	case protocol.MsgError:
 		return lineMsg(fmt.Sprintf("error: %s", msg.Error))
-	case "ack":
+	case protocol.MsgAck:
 		return lineMsg("(ok)")
 	default:
 		return lineMsg(fmt.Sprintf("(unknown message type: %s)", msg.Type))
@@ -138,12 +123,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			switch {
 			case text == "/rooms":
-				writeMessage(m.channel, outgoingMessage{Type: "list_rooms"})
+				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgListRooms})
 			case strings.HasPrefix(text, "/join "):
 				m.room = strings.TrimSpace(strings.TrimPrefix(text, "/join "))
-				writeMessage(m.channel, outgoingMessage{Type: "join", Room: m.room})
+				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: m.room})
 			default:
-				writeMessage(m.channel, outgoingMessage{Type: "send", Room: m.room, Body: text})
+				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: m.room, Body: text})
 			}
 			return m, nil
 		}
