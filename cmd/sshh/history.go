@@ -23,10 +23,9 @@ func newHistoryCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&addr, "addr", "localhost:2222", "server address")
-	cmd.Flags().StringVar(&user, "user", "", "chat username (required)")
+	cmd.Flags().StringVar(&user, "user", "", "only show messages from this user (optional)")
 	cmd.Flags().StringVar(&room, "room", "general", "room to fetch history for")
 	cmd.Flags().StringVar(&keyPath, "key", "", "path to the X25519 private key PEM file used to decrypt history (required)")
-	cmd.MarkFlagRequired("user")
 	cmd.MarkFlagRequired("key")
 
 	return cmd

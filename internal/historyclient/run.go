@@ -13,14 +13,14 @@ import (
 	"github.com/mennymendoza/sshh/internal/protocol"
 )
 
-func Run(addr, user, room, keyPath string) error {
+func Run(addr, sender, room, keyPath string) error {
 	priv, err := cryptox.LoadPrivateKey(keyPath)
 	if err != nil {
 		return fmt.Errorf("load private key: %w", err)
 	}
 
 	config := &ssh.ClientConfig{
-		User:            user,
+		User:            "history",
 		Auth:            []ssh.AuthMethod{ssh.Password("test")},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
@@ -50,7 +50,7 @@ func Run(addr, user, room, keyPath string) error {
 		}
 		switch msg.Type {
 		case protocol.MsgHistoryResult:
-			return printHistory(priv, msg)
+			return printHistory(priv, msg, sender)
 		case protocol.MsgError:
 			return fmt.Errorf("server error: %s", msg.Error)
 		}
@@ -68,12 +68,27 @@ func writeMessage(channel ssh.Channel, msg protocol.ClientMessage) error {
 	return err
 }
 
-func printHistory(priv *[32]byte, msg protocol.ServerMessage) error {
-	if len(msg.Messages) == 0 {
-		fmt.Fprintf(os.Stdout, "no messages in %s\n", msg.Room)
+func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string) error {
+	entries := msg.Messages
+	if sender != "" {
+		filtered := entries[:0]
+		for _, entry := range entries {
+			if entry.Sender == sender {
+				filtered = append(filtered, entry)
+			}
+		}
+		entries = filtered
+	}
+
+	if len(entries) == 0 {
+		if sender != "" {
+			fmt.Fprintf(os.Stdout, "no messages from %s in %s\n", sender, msg.Room)
+		} else {
+			fmt.Fprintf(os.Stdout, "no messages in %s\n", msg.Room)
+		}
 		return nil
 	}
-	for _, entry := range msg.Messages {
+	for _, entry := range entries {
 		ciphertext, err := base64.StdEncoding.DecodeString(entry.Body)
 		if err != nil {
 			return fmt.Errorf("decode message body from %s: %w", entry.Sender, err)
