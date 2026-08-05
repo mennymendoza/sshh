@@ -33,3 +33,6 @@ go.work.sum
 
 /sshh.db
 /host_key
+/sshh.key
+/sshh.pub
+
