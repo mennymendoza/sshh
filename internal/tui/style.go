@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Catppuccin-Mocha-ish palette, matching artifacts/tui.html.
 const (
 	colorBorder = lipgloss.Color("#cba6f7")
 	colorDim    = lipgloss.Color("#6c7086")
@@ -18,16 +17,15 @@ const (
 	colorBadge  = lipgloss.Color("#11111b")
 )
 
-// userPalette rotates sender name colors, chosen for contrast against a dark background.
 var userPalette = []lipgloss.Color{
-	"#cba6f7", // mauve
-	"#89dceb", // sky
-	"#fab387", // peach
-	"#94e2d5", // teal
-	"#eba0ac", // maroon
-	"#f9e2af", // yellow
-	"#a6e3a1", // green
-	"#89b4fa", // blue
+	"#cba6f7",
+	"#89dceb",
+	"#fab387",
+	"#94e2d5",
+	"#eba0ac",
+	"#f9e2af",
+	"#a6e3a1",
+	"#89b4fa",
 }
 
 var (
@@ -55,7 +53,6 @@ var (
 	leaveStyle = lipgloss.NewStyle().Foreground(colorLeave)
 )
 
-// userStyle returns a bold, colored style for name, stable across the session.
 func userStyle(name string) lipgloss.Style {
 	h := fnv.New32a()
 	h.Write([]byte(name))

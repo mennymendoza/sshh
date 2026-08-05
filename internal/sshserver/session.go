@@ -9,7 +9,6 @@ import (
 	"github.com/mennymendoza/sshh/internal/protocol"
 )
 
-// session drives the chat protocol for a single accepted SSH channel.
 type session struct {
 	server   *Server
 	channel  ssh.Channel
@@ -54,8 +53,6 @@ func (sess *session) run() {
 	}
 }
 
-// writeLoop relays outgoing payloads to the SSH channel until it's told to
-// stop or the channel write fails.
 func (sess *session) writeLoop() {
 	for {
 		select {
@@ -124,8 +121,6 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 	sess.send(protocol.ServerMessage{Type: protocol.MsgAck})
 }
 
-// broadcastUserEvent notifies everyone in room (including the triggering
-// session, once its subscription is active) that a user joined or left.
 func (sess *session) broadcastUserEvent(msgType, room, username string) {
 	payload, err := json.Marshal(protocol.ServerMessage{Type: msgType, Room: room, Sender: username})
 	if err != nil {
@@ -134,8 +129,6 @@ func (sess *session) broadcastUserEvent(msgType, room, username string) {
 	sess.server.rooms.Broadcast(room, append(payload, '\n'))
 }
 
-// relayLoop forwards broadcasts from the joined room's subscription channel
-// into this session's outgoing queue until the subscription is closed.
 func (sess *session) relayLoop(sub chan []byte) {
 	for payload := range sub {
 		select {

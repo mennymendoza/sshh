@@ -9,8 +9,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// LoadOrGenerateHostKey loads the SSH host key at path, generating and
-// persisting a new ed25519 key if none exists yet.
 func LoadOrGenerateHostKey(path string) (ssh.Signer, error) {
 	data, err := os.ReadFile(path)
 	if err == nil {

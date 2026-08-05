@@ -10,7 +10,6 @@ import (
 	"github.com/mennymendoza/sshh/internal/room"
 )
 
-// Server accepts SSH connections and dispatches chat channels to sessions.
 type Server struct {
 	cfg   *ssh.ServerConfig
 	rooms *room.Registry
