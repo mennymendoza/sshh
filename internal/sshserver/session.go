@@ -2,10 +2,13 @@ package sshserver
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/json"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/mennymendoza/sshh/internal/cryptox"
 	"github.com/mennymendoza/sshh/internal/protocol"
 )
 
@@ -89,6 +92,8 @@ func (sess *session) handleMessage(msg protocol.ClientMessage) {
 		sess.handleSend(msg)
 	case protocol.MsgListRooms:
 		sess.handleListRooms()
+	case protocol.MsgHistory:
+		sess.handleHistory(msg)
 	default:
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: "unknown message type"})
 	}
@@ -99,9 +104,11 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: "room is required"})
 		return
 	}
-	if _, err := sess.server.db.CreateRoom(msg.Room); err != nil {
-		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
-		return
+	if sess.server.db != nil {
+		if _, err := sess.server.db.CreateRoom(msg.Room); err != nil {
+			sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
+			return
+		}
 	}
 
 	if sess.leaveRoom != nil {
@@ -145,23 +152,35 @@ func (sess *session) handleSend(msg protocol.ClientMessage) {
 		return
 	}
 
-	roomRow, err := sess.server.db.CreateRoom(msg.Room)
-	if err != nil {
-		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
-		return
-	}
-	m, err := sess.server.db.InsertMessage(roomRow.ID, sess.username, msg.Body)
-	if err != nil {
-		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
-		return
+	sender := sess.username
+	createdAt := time.Now().UTC()
+
+	if sess.server.db != nil {
+		roomRow, err := sess.server.db.CreateRoom(msg.Room)
+		if err != nil {
+			sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
+			return
+		}
+		ciphertext, err := cryptox.Encrypt(sess.server.pubKey, []byte(msg.Body))
+		if err != nil {
+			sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
+			return
+		}
+		m, err := sess.server.db.InsertMessage(roomRow.ID, sess.username, base64.StdEncoding.EncodeToString(ciphertext))
+		if err != nil {
+			sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
+			return
+		}
+		sender = m.Sender
+		createdAt = m.CreatedAt
 	}
 
 	payload, err := json.Marshal(protocol.ServerMessage{
 		Type:      protocol.MsgMessage,
 		Room:      msg.Room,
-		Sender:    m.Sender,
-		Body:      m.Body,
-		CreatedAt: m.CreatedAt,
+		Sender:    sender,
+		Body:      msg.Body,
+		CreatedAt: createdAt,
 	})
 	if err != nil {
 		return
@@ -170,6 +189,10 @@ func (sess *session) handleSend(msg protocol.ClientMessage) {
 }
 
 func (sess *session) handleListRooms() {
+	if sess.server.db == nil {
+		sess.send(protocol.ServerMessage{Type: protocol.MsgRooms, Rooms: []string{}})
+		return
+	}
 	rooms, err := sess.server.db.ListRooms()
 	if err != nil {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
@@ -180,4 +203,32 @@ func (sess *session) handleListRooms() {
 		names[i] = r.Name
 	}
 	sess.send(protocol.ServerMessage{Type: protocol.MsgRooms, Rooms: names})
+}
+
+func (sess *session) handleHistory(msg protocol.ClientMessage) {
+	if sess.server.db == nil {
+		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: "no persistence configured on this server"})
+		return
+	}
+	if msg.Room == "" {
+		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: "room is required"})
+		return
+	}
+
+	roomRow, err := sess.server.db.CreateRoom(msg.Room)
+	if err != nil {
+		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
+		return
+	}
+	messages, err := sess.server.db.ListMessages(roomRow.ID)
+	if err != nil {
+		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
+		return
+	}
+
+	entries := make([]protocol.HistoryEntry, len(messages))
+	for i, m := range messages {
+		entries[i] = protocol.HistoryEntry{Sender: m.Sender, Body: m.Body, CreatedAt: m.CreatedAt}
+	}
+	sess.send(protocol.ServerMessage{Type: protocol.MsgHistoryResult, Room: msg.Room, Messages: entries})
 }

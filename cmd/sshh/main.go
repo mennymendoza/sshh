@@ -14,6 +14,7 @@ func main() {
 	}
 	root.AddCommand(newServerCmd())
 	root.AddCommand(newClientCmd())
+	root.AddCommand(newHistoryCmd())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -11,12 +11,13 @@ import (
 )
 
 type Server struct {
-	cfg   *ssh.ServerConfig
-	rooms *room.Registry
-	db    *db.DB
+	cfg    *ssh.ServerConfig
+	rooms  *room.Registry
+	db     *db.DB
+	pubKey *[32]byte
 }
 
-func NewServer(hostKey ssh.Signer, rooms *room.Registry, database *db.DB) *Server {
+func NewServer(hostKey ssh.Signer, rooms *room.Registry, database *db.DB, pubKey *[32]byte) *Server {
 	cfg := &ssh.ServerConfig{
 		PublicKeyCallback: func(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
 			return &ssh.Permissions{}, nil
@@ -26,7 +27,7 @@ func NewServer(hostKey ssh.Signer, rooms *room.Registry, database *db.DB) *Serve
 		},
 	}
 	cfg.AddHostKey(hostKey)
-	return &Server{cfg: cfg, rooms: rooms, db: database}
+	return &Server{cfg: cfg, rooms: rooms, db: database, pubKey: pubKey}
 }
 
 func (s *Server) Serve(l net.Listener) error {

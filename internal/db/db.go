@@ -69,3 +69,13 @@ func (d *DB) InsertMessage(roomID int64, sender, body string) (Message, error) {
 	err := d.Get(&m, insertMessageQuery, roomID, sender, body)
 	return m, err
 }
+
+const listMessagesQuery = `
+SELECT id, room_id, sender, body, created_at FROM messages
+WHERE room_id = ? ORDER BY created_at`
+
+func (d *DB) ListMessages(roomID int64) ([]Message, error) {
+	var messages []Message
+	err := d.Select(&messages, listMessagesQuery, roomID)
+	return messages, err
+}

@@ -8,16 +8,29 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/mennymendoza/sshh/internal/cryptox"
 	"github.com/mennymendoza/sshh/internal/db"
 	"github.com/mennymendoza/sshh/internal/room"
 )
 
-func Run(addr, dbPath, hostKeyPath string) error {
-	database, err := db.Open(dbPath)
-	if err != nil {
-		return fmt.Errorf("open db: %w", err)
+func Run(addr, dbPath, hostKeyPath, pubKeyPath string) error {
+	var database *db.DB
+	var pubKey *[32]byte
+
+	if dbPath != "" {
+		pk, err := cryptox.LoadPublicKey(pubKeyPath)
+		if err != nil {
+			return fmt.Errorf("load public key: %w", err)
+		}
+		pubKey = pk
+
+		d, err := db.Open(dbPath)
+		if err != nil {
+			return fmt.Errorf("open db: %w", err)
+		}
+		defer d.Close()
+		database = d
 	}
-	defer database.Close()
 
 	hostKey, err := LoadOrGenerateHostKey(hostKeyPath)
 	if err != nil {
@@ -25,7 +38,7 @@ func Run(addr, dbPath, hostKeyPath string) error {
 	}
 
 	rooms := room.NewRegistry()
-	server := NewServer(hostKey, rooms, database)
+	server := NewServer(hostKey, rooms, database, pubKey)
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
