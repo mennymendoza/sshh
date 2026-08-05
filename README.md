@@ -31,6 +31,18 @@ sshh client --addr localhost:2222 --user alice --room general
 
 In the client, type a message and hit enter to send. Slash commands: `/rooms` (list rooms), `/join <room>` (switch rooms), `/clear` (clear the screen).
 
+Send a single message without opening a session:
+
+```bash
+sshh client --addr localhost:2222 --user alice --room general --message "hello"
+```
+
+Print incoming messages to stdout without opening the TUI:
+
+```bash
+sshh client --addr localhost:2222 --user alice --room general --stream
+```
+
 ### Persisting and decrypting history
 
 To store messages (encrypted at rest), generate an X25519 keypair and start the server with `--db` and `--pub`:
