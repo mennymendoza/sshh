@@ -22,9 +22,10 @@ const (
 )
 
 type ClientMessage struct {
-	Type string `json:"type"`
-	Room string `json:"room,omitempty"`
-	Body string `json:"body,omitempty"`
+	Type  string `json:"type"`
+	Room  string `json:"room,omitempty"`
+	Body  string `json:"body,omitempty"`
+	Quiet bool   `json:"quiet,omitempty"`
 }
 
 type ServerMessage struct {

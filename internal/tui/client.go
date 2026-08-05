@@ -46,6 +46,82 @@ func Run(addr, user, room string) error {
 	return nil
 }
 
+func RunOnce(addr, user, room, message string) error {
+	config := &ssh.ClientConfig{
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.Password("test")},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", addr, err)
+	}
+	defer client.Close()
+
+	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
+	if err != nil {
+		return fmt.Errorf("open chat channel: %w", err)
+	}
+	defer channel.Close()
+	go ssh.DiscardRequests(requests)
+
+	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: room, Quiet: true})
+	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: room, Body: message})
+
+	scanner := bufio.NewScanner(channel)
+	for scanner.Scan() {
+		var msg protocol.ServerMessage
+		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+			return fmt.Errorf("decode server message: %w", err)
+		}
+		switch msg.Type {
+		case protocol.MsgError:
+			return fmt.Errorf("server error: %s", msg.Error)
+		case protocol.MsgMessage:
+			if msg.Room == room && msg.Sender == user && msg.Body == message {
+				return nil
+			}
+		}
+	}
+	return scanner.Err()
+}
+
+func RunStream(addr, user, room string) error {
+	config := &ssh.ClientConfig{
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.Password("test")},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", addr, err)
+	}
+	defer client.Close()
+
+	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
+	if err != nil {
+		return fmt.Errorf("open chat channel: %w", err)
+	}
+	defer channel.Close()
+	go ssh.DiscardRequests(requests)
+
+	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: room})
+
+	scanner := bufio.NewScanner(channel)
+	for scanner.Scan() {
+		var msg protocol.ServerMessage
+		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+			continue
+		}
+		if msg.Type == protocol.MsgMessage {
+			fmt.Printf("%s: %s\n", msg.Sender, msg.Body)
+		}
+	}
+	return scanner.Err()
+}
+
 func writeMessage(channel ssh.Channel, msg protocol.ClientMessage) {
 	payload, err := json.Marshal(msg)
 	if err != nil {

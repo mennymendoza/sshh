@@ -120,11 +120,15 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 	room, username := msg.Room, sess.username
 	sess.leaveRoom = func() {
 		leave()
-		sess.broadcastUserEvent(protocol.MsgUserLeft, room, username)
+		if !msg.Quiet {
+			sess.broadcastUserEvent(protocol.MsgUserLeft, room, username)
+		}
 	}
 	go sess.relayLoop(sub)
 
-	sess.broadcastUserEvent(protocol.MsgUserJoined, room, username)
+	if !msg.Quiet {
+		sess.broadcastUserEvent(protocol.MsgUserJoined, room, username)
+	}
 	sess.send(protocol.ServerMessage{Type: protocol.MsgAck})
 }
 
