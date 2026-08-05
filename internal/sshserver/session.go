@@ -112,10 +112,26 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 	}
 	sub, leave := sess.server.rooms.Join(msg.Room)
 	sess.currentRoom = msg.Room
-	sess.leaveRoom = leave
+
+	room, username := msg.Room, sess.username
+	sess.leaveRoom = func() {
+		leave()
+		sess.broadcastUserEvent(protocol.MsgUserLeft, room, username)
+	}
 	go sess.relayLoop(sub)
 
+	sess.broadcastUserEvent(protocol.MsgUserJoined, room, username)
 	sess.send(protocol.ServerMessage{Type: protocol.MsgAck})
+}
+
+// broadcastUserEvent notifies everyone in room (including the triggering
+// session, once its subscription is active) that a user joined or left.
+func (sess *session) broadcastUserEvent(msgType, room, username string) {
+	payload, err := json.Marshal(protocol.ServerMessage{Type: msgType, Room: room, Sender: username})
+	if err != nil {
+		return
+	}
+	sess.server.rooms.Broadcast(room, append(payload, '\n'))
 }
 
 // relayLoop forwards broadcasts from the joined room's subscription channel

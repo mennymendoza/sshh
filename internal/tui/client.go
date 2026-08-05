@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/mennymendoza/sshh/internal/protocol"
@@ -32,7 +33,7 @@ func Run(addr, user, room string) error {
 	}
 	go ssh.DiscardRequests(requests)
 
-	m := newModel(channel, room)
+	m := newModel(channel, user, room)
 	p := tea.NewProgram(m)
 
 	go readLoop(channel, p)
@@ -59,43 +60,54 @@ func readLoop(channel ssh.Channel, p *tea.Program) {
 	for scanner.Scan() {
 		var msg protocol.ServerMessage
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
-			p.Send(lineMsg(fmt.Sprintf("(unparseable line: %s)", scanner.Text())))
+			p.Send(lineMsg(dimStyle.Render(fmt.Sprintf("(unparseable line: %s)", scanner.Text()))))
 			continue
 		}
 		p.Send(formatIncoming(msg))
 	}
-	p.Send(lineMsg("(disconnected)"))
+	p.Send(lineMsg(dimStyle.Render("(disconnected)")))
 }
 
 func formatIncoming(msg protocol.ServerMessage) lineMsg {
 	switch msg.Type {
 	case protocol.MsgMessage:
-		return lineMsg(fmt.Sprintf("[%s] %s: %s", msg.Room, msg.Sender, msg.Body))
+		return lineMsg(fmt.Sprintf("%s: %s", userStyle(msg.Sender).Render(msg.Sender), msg.Body))
 	case protocol.MsgRooms:
-		return lineMsg(fmt.Sprintf("rooms: %s", strings.Join(msg.Rooms, ", ")))
+		return lineMsg(infoStyle.Render(fmt.Sprintf("rooms: %s", strings.Join(msg.Rooms, ", "))))
 	case protocol.MsgError:
-		return lineMsg(fmt.Sprintf("error: %s", msg.Error))
+		return lineMsg(errorStyle.Render(fmt.Sprintf("error: %s", msg.Error)))
 	case protocol.MsgAck:
-		return lineMsg("(ok)")
+		return lineMsg(okStyle.Render("(ok)"))
+	case protocol.MsgUserJoined:
+		return lineMsg(joinStyle.Render(fmt.Sprintf("→ %s joined %s", msg.Sender, msg.Room)))
+	case protocol.MsgUserLeft:
+		return lineMsg(leaveStyle.Render(fmt.Sprintf("← %s left %s", msg.Sender, msg.Room)))
 	default:
-		return lineMsg(fmt.Sprintf("(unknown message type: %s)", msg.Type))
+		return lineMsg(dimStyle.Render(fmt.Sprintf("(unknown message type: %s)", msg.Type)))
 	}
 }
 
 type lineMsg string
 
+const defaultWidth = 76
+
 type model struct {
 	channel ssh.Channel
+	user    string
 	room    string
 	input   textinput.Model
 	lines   []string
+	width   int
 }
 
-func newModel(channel ssh.Channel, room string) model {
+func newModel(channel ssh.Channel, user, room string) model {
 	ti := textinput.New()
-	ti.Placeholder = "type a message, /rooms, or /join <room>"
+	ti.Prompt = "> "
+	ti.PromptStyle = promptStyle
+	ti.PlaceholderStyle = placeholderStyle
+	ti.Placeholder = "type a message, /rooms, /join <room>, or /clear"
 	ti.Focus()
-	return model{channel: channel, room: room, input: ti}
+	return model{channel: channel, user: user, room: room, input: ti, width: defaultWidth}
 }
 
 func (m model) Init() tea.Cmd {
@@ -104,6 +116,17 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width - 4
+		if m.width > 96 {
+			m.width = 96
+		}
+		if m.width < 32 {
+			m.width = 32
+		}
+		m.input.Width = m.width - 4
+		return m, nil
+
 	case lineMsg:
 		m.lines = append(m.lines, string(msg))
 		if len(m.lines) > 200 {
@@ -124,6 +147,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case text == "/rooms":
 				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgListRooms})
+			case text == "/clear":
+				m.lines = nil
 			case strings.HasPrefix(text, "/join "):
 				m.room = strings.TrimSpace(strings.TrimPrefix(text, "/join "))
 				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: m.room})
@@ -140,12 +165,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	var b strings.Builder
+	header := titleStyle.Render(fmt.Sprintf("sshh client — connected as %s", m.user))
+
+	var log strings.Builder
 	for _, line := range m.lines {
-		b.WriteString(line)
-		b.WriteString("\n")
+		log.WriteString(line)
+		log.WriteString("\n")
 	}
-	fmt.Fprintf(&b, "-- room: %s --\n", m.room)
-	b.WriteString(m.input.View())
-	return b.String()
+
+	body := lipgloss.JoinVertical(lipgloss.Left,
+		header,
+		"",
+		strings.TrimRight(log.String(), "\n"),
+		"",
+		badgeStyle.Render(m.room),
+		m.input.View(),
+	)
+
+	return frameStyle.Width(m.width).Render(body)
 }

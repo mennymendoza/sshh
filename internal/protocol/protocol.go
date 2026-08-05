@@ -16,10 +16,12 @@ const (
 
 // Server -> client message types.
 const (
-	MsgAck     = "ack"
-	MsgError   = "error"
-	MsgMessage = "message"
-	MsgRooms   = "rooms"
+	MsgAck        = "ack"
+	MsgError      = "error"
+	MsgMessage    = "message"
+	MsgRooms      = "rooms"
+	MsgUserJoined = "user_joined"
+	MsgUserLeft   = "user_left"
 )
 
 // ClientMessage is sent from the client to the server.
