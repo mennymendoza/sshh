@@ -1,5 +1,5 @@
 # sshh
-a tiny SSH chat server
+a tiny SSH chat server. Pronounced "shush".
 
 ## Installation
 
