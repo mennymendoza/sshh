@@ -92,6 +92,8 @@ func (sess *session) handleMessage(msg protocol.ClientMessage) {
 		sess.handleSend(msg)
 	case protocol.MsgListRooms:
 		sess.handleListRooms()
+	case protocol.MsgListUsers:
+		sess.handleListUsers()
 	case protocol.MsgHistory:
 		sess.handleHistory(msg)
 	default:
@@ -114,12 +116,15 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 	if sess.leaveRoom != nil {
 		sess.leaveRoom()
 	}
-	sub, leave := sess.server.rooms.Join(msg.Room)
+	sub, leave := sess.server.rooms.Join(msg.Room, sess.username)
 	sess.currentRoom = msg.Room
 
 	room, username := msg.Room, sess.username
 	sess.leaveRoom = func() {
-		leave()
+		wasLast := leave()
+		if wasLast && sess.server.db != nil {
+			_ = sess.server.db.DeleteRoom(room)
+		}
 		if !msg.Quiet {
 			sess.broadcastUserEvent(protocol.MsgUserLeft, room, username)
 		}
@@ -207,6 +212,15 @@ func (sess *session) handleListRooms() {
 		names[i] = r.Name
 	}
 	sess.send(protocol.ServerMessage{Type: protocol.MsgRooms, Rooms: names})
+}
+
+func (sess *session) handleListUsers() {
+	if sess.currentRoom == "" {
+		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: "not joined to room"})
+		return
+	}
+	users := sess.server.rooms.Users(sess.currentRoom)
+	sess.send(protocol.ServerMessage{Type: protocol.MsgUsers, Room: sess.currentRoom, Users: users})
 }
 
 func (sess *session) handleHistory(msg protocol.ClientMessage) {

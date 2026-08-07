@@ -79,3 +79,23 @@ func (d *DB) ListMessages(roomID int64) ([]Message, error) {
 	err := d.Select(&messages, listMessagesQuery, roomID)
 	return messages, err
 }
+
+const deleteRoomMessagesQuery = `DELETE FROM messages WHERE room_id = (SELECT id FROM rooms WHERE name = ?)`
+
+const deleteRoomQuery = `DELETE FROM rooms WHERE name = ?`
+
+func (d *DB) DeleteRoom(name string) error {
+	tx, err := d.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(deleteRoomMessagesQuery, name); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(deleteRoomQuery, name); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

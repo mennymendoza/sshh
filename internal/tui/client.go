@@ -150,6 +150,8 @@ func formatIncoming(msg protocol.ServerMessage) lineMsg {
 		return lineMsg(fmt.Sprintf("%s: %s", userStyle(msg.Sender).Render(msg.Sender), msg.Body))
 	case protocol.MsgRooms:
 		return lineMsg(infoStyle.Render(fmt.Sprintf("rooms: %s", strings.Join(msg.Rooms, ", "))))
+	case protocol.MsgUsers:
+		return lineMsg(infoStyle.Render(fmt.Sprintf("users in %s: %s", msg.Room, strings.Join(msg.Users, ", "))))
 	case protocol.MsgError:
 		return lineMsg(errorStyle.Render(fmt.Sprintf("error: %s", msg.Error)))
 	case protocol.MsgAck:
@@ -165,15 +167,22 @@ func formatIncoming(msg protocol.ServerMessage) lineMsg {
 
 type lineMsg string
 
-const defaultWidth = 76
+const (
+	defaultWidth        = 76
+	defaultVisibleLines = 20
+	minVisibleLines     = 3
+	fixedChromeLines    = 6
+)
 
 type model struct {
-	channel ssh.Channel
-	user    string
-	room    string
-	input   textinput.Model
-	lines   []string
-	width   int
+	channel      ssh.Channel
+	user         string
+	room         string
+	input        textinput.Model
+	lines        []string
+	width        int
+	height       int
+	scrollOffset int
 }
 
 func newModel(channel ssh.Channel, user, room string) model {
@@ -181,13 +190,28 @@ func newModel(channel ssh.Channel, user, room string) model {
 	ti.Prompt = "> "
 	ti.PromptStyle = promptStyle
 	ti.PlaceholderStyle = placeholderStyle
-	ti.Placeholder = "type a message, /rooms, /join <room>, or /clear"
+	ti.Placeholder = "type a message, or /help for commands"
 	ti.Focus()
 	return model{channel: channel, user: user, room: room, input: ti, width: defaultWidth}
 }
 
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
+}
+
+func (m model) visibleLines() int {
+	if m.height <= 0 {
+		return defaultVisibleLines
+	}
+	n := m.height - fixedChromeLines
+	if n < minVisibleLines {
+		return minVisibleLines
+	}
+	return n
+}
+
+func (m model) maxScrollOffset() int {
+	return max(0, len(m.lines)-m.visibleLines())
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -201,6 +225,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.width = 32
 		}
 		m.input.Width = m.width - 4
+		m.height = msg.Height
+		m.scrollOffset = min(m.scrollOffset, m.maxScrollOffset())
 		return m, nil
 
 	case lineMsg:
@@ -208,12 +234,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.lines) > 200 {
 			m.lines = m.lines[len(m.lines)-200:]
 		}
+		m.scrollOffset = min(m.scrollOffset, m.maxScrollOffset())
 		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
 			return m, tea.Quit
+		case tea.KeyUp:
+			m.scrollOffset = min(m.scrollOffset+1, m.maxScrollOffset())
+			return m, nil
+		case tea.KeyDown:
+			m.scrollOffset = max(m.scrollOffset-1, 0)
+			return m, nil
 		case tea.KeyEnter:
 			text := strings.TrimSpace(m.input.Value())
 			m.input.SetValue("")
@@ -223,8 +256,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch {
 			case text == "/rooms":
 				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgListRooms})
+			case text == "/users":
+				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgListUsers, Room: m.room})
 			case text == "/clear":
 				m.lines = nil
+			case text == "/help":
+				m.lines = append(m.lines,
+					infoStyle.Render("available commands:"),
+					infoStyle.Render("  /rooms          list all rooms"),
+					infoStyle.Render("  /users          list users in the current room"),
+					infoStyle.Render("  /join <room>    switch to a different room"),
+					infoStyle.Render("  /clear          clear the message log"),
+					infoStyle.Render("  /help           show this message"),
+					infoStyle.Render("  (anything else) send a message to the current room"),
+				)
 			case strings.HasPrefix(text, "/join "):
 				m.room = strings.TrimSpace(strings.TrimPrefix(text, "/join "))
 				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: m.room})
@@ -243,8 +288,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	header := titleStyle.Render(fmt.Sprintf("sshh client — connected as %s", m.user))
 
+	total := len(m.lines)
+	visible := m.visibleLines()
+	start := total - visible - m.scrollOffset
+	if start < 0 {
+		start = 0
+	}
+	end := start + visible
+	if end > total {
+		end = total
+	}
+	shown := m.lines[start:end]
+
 	var log strings.Builder
-	for _, line := range m.lines {
+	if start > 0 {
+		log.WriteString(dimStyle.Render("↑ scrolled back"))
+		log.WriteString("\n")
+	}
+	for _, line := range shown {
 		log.WriteString(line)
 		log.WriteString("\n")
 	}

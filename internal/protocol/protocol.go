@@ -8,6 +8,7 @@ const (
 	MsgJoin      = "join"
 	MsgSend      = "send"
 	MsgListRooms = "list_rooms"
+	MsgListUsers = "list_users"
 	MsgHistory   = "history"
 )
 
@@ -16,6 +17,7 @@ const (
 	MsgError         = "error"
 	MsgMessage       = "message"
 	MsgRooms         = "rooms"
+	MsgUsers         = "users"
 	MsgUserJoined    = "user_joined"
 	MsgUserLeft      = "user_left"
 	MsgHistoryResult = "history"
@@ -35,6 +37,7 @@ type ServerMessage struct {
 	Body      string         `json:"body,omitempty"`
 	CreatedAt time.Time      `json:"created_at,omitempty"`
 	Rooms     []string       `json:"rooms,omitempty"`
+	Users     []string       `json:"users,omitempty"`
 	Error     string         `json:"error,omitempty"`
 	Messages  []HistoryEntry `json:"messages,omitempty"`
 }

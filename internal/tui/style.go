@@ -7,25 +7,25 @@ import (
 )
 
 const (
-	colorBorder = lipgloss.Color("#cba6f7")
-	colorDim    = lipgloss.Color("#6c7086")
-	colorOK     = lipgloss.Color("#a6e3a1")
-	colorError  = lipgloss.Color("#f38ba8")
-	colorInfo   = lipgloss.Color("#f9e2af")
-	colorJoin   = lipgloss.Color("#a6e3a1")
-	colorLeave  = lipgloss.Color("#9399b2")
-	colorBadge  = lipgloss.Color("#11111b")
+	colorBorder = lipgloss.Color("#bb9af7")
+	colorDim    = lipgloss.Color("#565f89")
+	colorOK     = lipgloss.Color("#9ece6a")
+	colorError  = lipgloss.Color("#f7768e")
+	colorInfo   = lipgloss.Color("#e0af68")
+	colorJoin   = lipgloss.Color("#9ece6a")
+	colorLeave  = lipgloss.Color("#565f89")
+	colorBadge  = lipgloss.Color("#1a1b26")
 )
 
 var userPalette = []lipgloss.Color{
-	"#cba6f7",
-	"#89dceb",
-	"#fab387",
-	"#94e2d5",
-	"#eba0ac",
-	"#f9e2af",
-	"#a6e3a1",
-	"#89b4fa",
+	"#7aa2f7",
+	"#7dcfff",
+	"#bb9af7",
+	"#9ece6a",
+	"#e0af68",
+	"#ff9e64",
+	"#f7768e",
+	"#73daca",
 }
 
 var (
