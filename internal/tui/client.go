@@ -302,7 +302,7 @@ func (m model) View() string {
 
 	var log strings.Builder
 	if start > 0 {
-		log.WriteString(dimStyle.Render("↑ scrolled back"))
+		log.WriteString(dimStyle.Render("↑ scroll back"))
 		log.WriteString("\n")
 	}
 	for _, line := range shown {
