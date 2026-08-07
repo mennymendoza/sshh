@@ -199,7 +199,7 @@ func (sess *session) handleSend(msg protocol.ClientMessage) {
 
 func (sess *session) handleListRooms() {
 	if sess.server.db == nil {
-		sess.send(protocol.ServerMessage{Type: protocol.MsgRooms, Rooms: []string{}})
+		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: "room listing unavailable: server was started without --db and --pub"})
 		return
 	}
 	rooms, err := sess.server.db.ListRooms()
