@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/crypto/ssh"
@@ -34,7 +34,7 @@ func Run(addr, user, room string) error {
 	go ssh.DiscardRequests(requests)
 
 	m := newModel(channel, user, room)
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	go readLoop(channel, p)
 
@@ -171,14 +171,16 @@ const (
 	defaultWidth        = 76
 	defaultVisibleLines = 20
 	minVisibleLines     = 3
-	fixedChromeLines    = 6
+	fixedChromeLines    = 8
+	inputHeight         = 3
+	inputPromptWidth    = 2
 )
 
 type model struct {
 	channel      ssh.Channel
 	user         string
 	room         string
-	input        textinput.Model
+	input        textarea.Model
 	lines        []string
 	width        int
 	height       int
@@ -186,17 +188,28 @@ type model struct {
 }
 
 func newModel(channel ssh.Channel, user, room string) model {
-	ti := textinput.New()
-	ti.Prompt = "> "
-	ti.PromptStyle = promptStyle
-	ti.PlaceholderStyle = placeholderStyle
-	ti.Placeholder = "type a message, or /help for commands"
-	ti.Focus()
-	return model{channel: channel, user: user, room: room, input: ti, width: defaultWidth}
+	ta := textarea.New()
+	ta.ShowLineNumbers = false
+	ta.Placeholder = "type a message, or /help for commands"
+	ta.SetPromptFunc(inputPromptWidth, func(lineIdx int) string {
+		if lineIdx == 0 {
+			return "> "
+		}
+		return "  "
+	})
+	ta.FocusedStyle.Prompt = promptStyle
+	ta.BlurredStyle.Prompt = promptStyle
+	ta.FocusedStyle.Placeholder = placeholderStyle
+	ta.BlurredStyle.Placeholder = placeholderStyle
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	ta.BlurredStyle.CursorLine = lipgloss.NewStyle()
+	ta.SetHeight(inputHeight)
+	ta.Focus()
+	return model{channel: channel, user: user, room: room, input: ta, width: defaultWidth}
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return textarea.Blink
 }
 
 func (m model) visibleLines() int {
@@ -217,14 +230,11 @@ func (m model) maxScrollOffset() int {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width - 4
-		if m.width > 96 {
-			m.width = 96
-		}
+		m.width = msg.Width - 2
 		if m.width < 32 {
 			m.width = 32
 		}
-		m.input.Width = m.width - 4
+		m.input.SetWidth(m.width - 2)
 		m.height = msg.Height
 		m.scrollOffset = min(m.scrollOffset, m.maxScrollOffset())
 		return m, nil
