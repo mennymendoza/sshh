@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	colorBorder = lipgloss.Color("#bb9af7")
+	colorBorder = lipgloss.Color("#7aa2f7")
 	colorDim    = lipgloss.Color("#565f89")
 	colorOK     = lipgloss.Color("#9ece6a")
 	colorError  = lipgloss.Color("#f7768e")
