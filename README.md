@@ -29,7 +29,7 @@ Connect with the client:
 sshh client --addr localhost:2222 --user alice --room general
 ```
 
-In the client, type a message and hit enter to send. Slash commands: `/rooms` (list rooms), `/users` (list users in the current room), `/join <room>` (switch rooms), `/clear` (clear the screen), `/help` (show available commands).
+In the client, type a message and hit enter to send. Slash commands: `/rooms` (list rooms that currently have someone in them), `/users` (list users in the current room), `/join <room>` (switch rooms), `/clear` (clear the screen), `/help` (show available commands).
 
 Send a single message without opening a session:
 
@@ -54,7 +54,7 @@ openssl pkey -in sshh.key -pubout -out sshh.pub
 sshh server --addr :2222 --db sshh.db --pub sshh.pub
 ```
 
-Fetch and decrypt a room's history with the matching private key:
+A room's history is kept even after everyone leaves it (so it drops out of `/rooms` until someone rejoins) — fetch and decrypt it with the matching private key:
 
 ```bash
 sshh history --addr localhost:2222 --key sshh.key --room general
