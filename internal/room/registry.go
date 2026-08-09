@@ -53,6 +53,18 @@ func (r *Registry) Broadcast(roomName string, payload []byte) {
 	}
 }
 
+// ActiveNames returns the set of rooms that currently have at least one subscriber.
+func (r *Registry) ActiveNames() map[string]struct{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	names := make(map[string]struct{}, len(r.rooms))
+	for name := range r.rooms {
+		names[name] = struct{}{}
+	}
+	return names
+}
+
 func (r *Registry) Users(roomName string) []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -121,10 +121,7 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 
 	room, username := msg.Room, sess.username
 	sess.leaveRoom = func() {
-		wasLast := leave()
-		if wasLast && sess.server.db != nil {
-			_ = sess.server.db.DeleteRoom(room)
-		}
+		leave()
 		if !msg.Quiet {
 			sess.broadcastUserEvent(protocol.MsgUserLeft, room, username)
 		}
@@ -207,9 +204,12 @@ func (sess *session) handleListRooms() {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
 		return
 	}
-	names := make([]string, len(rooms))
-	for i, r := range rooms {
-		names[i] = r.Name
+	active := sess.server.rooms.ActiveNames()
+	names := make([]string, 0, len(rooms))
+	for _, r := range rooms {
+		if _, ok := active[r.Name]; ok {
+			names = append(names, r.Name)
+		}
 	}
 	sess.send(protocol.ServerMessage{Type: protocol.MsgRooms, Rooms: names})
 }
