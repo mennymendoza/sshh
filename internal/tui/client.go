@@ -12,26 +12,15 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/mennymendoza/sshh/internal/protocol"
+	"github.com/mennymendoza/sshh/internal/sshclient"
 )
 
 func Run(addr, user, room string) error {
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.Password("test")},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	client, err := ssh.Dial("tcp", addr, config)
+	client, channel, err := sshclient.Dial(addr, user)
 	if err != nil {
-		return fmt.Errorf("dial %s: %w", addr, err)
+		return err
 	}
 	defer client.Close()
-
-	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
-	if err != nil {
-		return fmt.Errorf("open chat channel: %w", err)
-	}
-	go ssh.DiscardRequests(requests)
 
 	m := newModel(channel, user, room)
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -47,24 +36,12 @@ func Run(addr, user, room string) error {
 }
 
 func RunOnce(addr, user, room, message string) error {
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.Password("test")},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	client, err := ssh.Dial("tcp", addr, config)
+	client, channel, err := sshclient.Dial(addr, user)
 	if err != nil {
-		return fmt.Errorf("dial %s: %w", addr, err)
+		return err
 	}
 	defer client.Close()
-
-	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
-	if err != nil {
-		return fmt.Errorf("open chat channel: %w", err)
-	}
 	defer channel.Close()
-	go ssh.DiscardRequests(requests)
 
 	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: room, Quiet: true})
 	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: room, Body: message})
@@ -88,24 +65,12 @@ func RunOnce(addr, user, room, message string) error {
 }
 
 func RunStream(addr, user, room string) error {
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.Password("test")},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	client, err := ssh.Dial("tcp", addr, config)
+	client, channel, err := sshclient.Dial(addr, user)
 	if err != nil {
-		return fmt.Errorf("dial %s: %w", addr, err)
+		return err
 	}
 	defer client.Close()
-
-	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
-	if err != nil {
-		return fmt.Errorf("open chat channel: %w", err)
-	}
 	defer channel.Close()
-	go ssh.DiscardRequests(requests)
 
 	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: room})
 
@@ -123,11 +88,10 @@ func RunStream(addr, user, room string) error {
 }
 
 func writeMessage(channel ssh.Channel, msg protocol.ClientMessage) {
-	payload, err := json.Marshal(msg)
+	payload, err := protocol.Encode(msg)
 	if err != nil {
 		return
 	}
-	payload = append(payload, '\n')
 	channel.Write(payload)
 }
 

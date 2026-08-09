@@ -1,6 +1,9 @@
 package protocol
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 const ChannelType = "chat"
 
@@ -50,4 +53,12 @@ type HistoryEntry struct {
 	Sender    string    `json:"sender"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+func Encode(msg any) ([]byte, error) {
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	return append(payload, '\n'), nil
 }

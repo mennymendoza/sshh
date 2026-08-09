@@ -12,6 +12,7 @@ import (
 
 	"github.com/mennymendoza/sshh/internal/cryptox"
 	"github.com/mennymendoza/sshh/internal/protocol"
+	"github.com/mennymendoza/sshh/internal/sshclient"
 )
 
 func Run(addr, sender, room, keyPath string, asJSON bool, page, pageSize uint) error {
@@ -20,24 +21,12 @@ func Run(addr, sender, room, keyPath string, asJSON bool, page, pageSize uint) e
 		return fmt.Errorf("load private key: %w", err)
 	}
 
-	config := &ssh.ClientConfig{
-		User:            "history",
-		Auth:            []ssh.AuthMethod{ssh.Password("test")},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
-	client, err := ssh.Dial("tcp", addr, config)
+	client, channel, err := sshclient.Dial(addr, "history")
 	if err != nil {
-		return fmt.Errorf("dial %s: %w", addr, err)
+		return err
 	}
 	defer client.Close()
-
-	channel, requests, err := client.OpenChannel(protocol.ChannelType, nil)
-	if err != nil {
-		return fmt.Errorf("open chat channel: %w", err)
-	}
 	defer channel.Close()
-	go ssh.DiscardRequests(requests)
 
 	if err := writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgHistory, Room: room, Page: page, PageSize: pageSize}); err != nil {
 		return fmt.Errorf("request history: %w", err)
@@ -60,11 +49,10 @@ func Run(addr, sender, room, keyPath string, asJSON bool, page, pageSize uint) e
 }
 
 func writeMessage(channel ssh.Channel, msg protocol.ClientMessage) error {
-	payload, err := json.Marshal(msg)
+	payload, err := protocol.Encode(msg)
 	if err != nil {
 		return err
 	}
-	payload = append(payload, '\n')
 	_, err = channel.Write(payload)
 	return err
 }

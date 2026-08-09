@@ -73,11 +73,10 @@ func (sess *session) writeLoop() {
 }
 
 func (sess *session) send(msg protocol.ServerMessage) {
-	payload, err := json.Marshal(msg)
+	payload, err := protocol.Encode(msg)
 	if err != nil {
 		return
 	}
-	payload = append(payload, '\n')
 	select {
 	case sess.out <- payload:
 	case <-sess.done:
@@ -135,11 +134,11 @@ func (sess *session) handleJoin(msg protocol.ClientMessage) {
 }
 
 func (sess *session) broadcastUserEvent(msgType, room, username string) {
-	payload, err := json.Marshal(protocol.ServerMessage{Type: msgType, Room: room, Sender: username})
+	payload, err := protocol.Encode(protocol.ServerMessage{Type: msgType, Room: room, Sender: username})
 	if err != nil {
 		return
 	}
-	sess.server.rooms.Broadcast(room, append(payload, '\n'))
+	sess.server.rooms.Broadcast(room, payload)
 }
 
 func (sess *session) relayLoop(sub chan []byte) {
@@ -181,7 +180,7 @@ func (sess *session) handleSend(msg protocol.ClientMessage) {
 		createdAt = m.CreatedAt
 	}
 
-	payload, err := json.Marshal(protocol.ServerMessage{
+	payload, err := protocol.Encode(protocol.ServerMessage{
 		Type:      protocol.MsgMessage,
 		Room:      msg.Room,
 		Sender:    sender,
@@ -191,7 +190,7 @@ func (sess *session) handleSend(msg protocol.ClientMessage) {
 	if err != nil {
 		return
 	}
-	sess.server.rooms.Broadcast(msg.Room, append(payload, '\n'))
+	sess.server.rooms.Broadcast(msg.Room, payload)
 }
 
 func (sess *session) handleListRooms() {
