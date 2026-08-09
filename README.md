@@ -59,3 +59,9 @@ Fetch and decrypt a room's history with the matching private key:
 ```bash
 sshh history --addr localhost:2222 --key sshh.key --room general
 ```
+
+History is paginated: `--page` defaults to `1` and `--pagesize` defaults to `100`. Both are non-negative integers, with pages starting at index 1.
+
+```bash
+sshh history --addr localhost:2222 --key sshh.key --room general --page 2 --pagesize 50
+```

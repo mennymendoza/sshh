@@ -72,11 +72,12 @@ func (d *DB) InsertMessage(roomID int64, sender, body string) (Message, error) {
 
 const listMessagesQuery = `
 SELECT id, room_id, sender, body, created_at FROM messages
-WHERE room_id = ? ORDER BY created_at`
+WHERE room_id = ? ORDER BY created_at
+LIMIT ? OFFSET ?`
 
-func (d *DB) ListMessages(roomID int64) ([]Message, error) {
+func (d *DB) ListMessages(roomID int64, page, pageSize uint) ([]Message, error) {
 	var messages []Message
-	err := d.Select(&messages, listMessagesQuery, roomID)
+	err := d.Select(&messages, listMessagesQuery, roomID, pageSize, (page-1)*pageSize)
 	return messages, err
 }
 

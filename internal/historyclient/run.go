@@ -14,7 +14,7 @@ import (
 	"github.com/mennymendoza/sshh/internal/protocol"
 )
 
-func Run(addr, sender, room, keyPath string, asJSON bool) error {
+func Run(addr, sender, room, keyPath string, asJSON bool, page, pageSize uint) error {
 	priv, err := cryptox.LoadPrivateKey(keyPath)
 	if err != nil {
 		return fmt.Errorf("load private key: %w", err)
@@ -39,7 +39,7 @@ func Run(addr, sender, room, keyPath string, asJSON bool) error {
 	defer channel.Close()
 	go ssh.DiscardRequests(requests)
 
-	if err := writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgHistory, Room: room}); err != nil {
+	if err := writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgHistory, Room: room, Page: page, PageSize: pageSize}); err != nil {
 		return fmt.Errorf("request history: %w", err)
 	}
 
@@ -89,9 +89,9 @@ func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string, asJ
 
 	if !asJSON && len(entries) == 0 {
 		if sender != "" {
-			fmt.Fprintf(os.Stdout, "no messages from %s in %s\n", sender, msg.Room)
+			fmt.Fprintf(os.Stdout, "no messages from %s in %s (page %d)\n", sender, msg.Room, msg.Page)
 		} else {
-			fmt.Fprintf(os.Stdout, "no messages in %s\n", msg.Room)
+			fmt.Fprintf(os.Stdout, "no messages in %s (page %d)\n", msg.Room, msg.Page)
 		}
 		return nil
 	}

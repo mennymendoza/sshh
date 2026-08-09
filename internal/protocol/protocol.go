@@ -24,10 +24,12 @@ const (
 )
 
 type ClientMessage struct {
-	Type  string `json:"type"`
-	Room  string `json:"room,omitempty"`
-	Body  string `json:"body,omitempty"`
-	Quiet bool   `json:"quiet,omitempty"`
+	Type     string `json:"type"`
+	Room     string `json:"room,omitempty"`
+	Body     string `json:"body,omitempty"`
+	Quiet    bool   `json:"quiet,omitempty"`
+	Page     uint   `json:"page,omitempty"`
+	PageSize uint   `json:"page_size,omitempty"`
 }
 
 type ServerMessage struct {
@@ -40,6 +42,8 @@ type ServerMessage struct {
 	Users     []string       `json:"users,omitempty"`
 	Error     string         `json:"error,omitempty"`
 	Messages  []HistoryEntry `json:"messages,omitempty"`
+	Page      uint           `json:"page,omitempty"`
+	PageSize  uint           `json:"page_size,omitempty"`
 }
 
 type HistoryEntry struct {

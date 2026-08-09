@@ -233,12 +233,21 @@ func (sess *session) handleHistory(msg protocol.ClientMessage) {
 		return
 	}
 
+	page := msg.Page
+	if page == 0 {
+		page = 1
+	}
+	pageSize := msg.PageSize
+	if pageSize == 0 {
+		pageSize = 100
+	}
+
 	roomRow, err := sess.server.db.CreateRoom(msg.Room)
 	if err != nil {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
 		return
 	}
-	messages, err := sess.server.db.ListMessages(roomRow.ID)
+	messages, err := sess.server.db.ListMessages(roomRow.ID, page, pageSize)
 	if err != nil {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
 		return
@@ -248,5 +257,5 @@ func (sess *session) handleHistory(msg protocol.ClientMessage) {
 	for i, m := range messages {
 		entries[i] = protocol.HistoryEntry{Sender: m.Sender, Body: m.Body, CreatedAt: m.CreatedAt}
 	}
-	sess.send(protocol.ServerMessage{Type: protocol.MsgHistoryResult, Room: msg.Room, Messages: entries})
+	sess.send(protocol.ServerMessage{Type: protocol.MsgHistoryResult, Room: msg.Room, Messages: entries, Page: page, PageSize: pageSize})
 }
