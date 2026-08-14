@@ -29,7 +29,7 @@ Connect with the client:
 sshh client --addr localhost:2222 --user alice --room general
 ```
 
-In the client, type a message and hit enter to send. Slash commands: `/rooms` (list rooms that currently have someone in them), `/users` (list users in the current room), `/join <room>` (switch rooms), `/clear` (clear the screen), `/help` (show available commands).
+In the client, type a message and hit enter to send. Slash commands: `/rooms` (list rooms that currently have someone in them), `/users` (list users in the current room), `/join <room>` (switch rooms), `/emoji` (browse all emoji and type to filter, then pick one to insert), `/clear` (clear the screen), `/help` (show available commands).
 
 Send a single message without opening a session:
 
