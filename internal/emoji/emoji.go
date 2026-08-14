@@ -509,6 +509,19 @@ var catalog = []Entry{
 	{"\U0001f465", "busts in silhouette"},
 	{"\U0001fac2", "people hugging"},
 	{"\U0001f463", "footprints"},
+	{"\U0001f525", "fire"},
+	{"\u2728", "sparkles"},
+	{"\U0001f389", "party popper"},
+	{"\U0001f308", "rainbow"},
+	{"\U0001f31a", "new moon face"},
+	{"\U0001f98b", "butterfly"},
+	{"\U0001fa77", "pink heart"},
+	{"\U0001fae0", "melting face"},
+	{"\U0001fae1", "saluting face"},
+	{"\U0001fae3", "face with peeking eye"},
+	{"\U0001faf0", "hand with index finger and thumb crossed"},
+	{"\U0001faf6", "heart hands"},
+	{"\U0001f979", "face holding back tears"},
 }
 
 func Search(query string) []Entry {
