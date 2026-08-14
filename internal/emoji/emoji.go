@@ -524,6 +524,10 @@ var catalog = []Entry{
 	{"\U0001f979", "face holding back tears"},
 }
 
+func All() []Entry {
+	return catalog
+}
+
 func Search(query string) []Entry {
 	query = strings.ToLower(strings.TrimSpace(query))
 	if query == "" {

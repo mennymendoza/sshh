@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/crypto/ssh"
@@ -139,7 +140,8 @@ const (
 	fixedChromeLines    = 8
 	inputHeight         = 3
 	inputPromptWidth    = 2
-	maxEmojiResults     = 8
+	pickerVisibleRows   = 5
+	pickerMaxWidth      = 54
 )
 
 type model struct {
@@ -152,6 +154,7 @@ type model struct {
 	height        int
 	scrollOffset  int
 	pickerActive  bool
+	pickerFilter  textinput.Model
 	pickerResults []emoji.Entry
 	pickerIndex   int
 }
@@ -174,7 +177,21 @@ func newModel(channel ssh.Channel, user, room string) model {
 	ta.BlurredStyle.CursorLine = lipgloss.NewStyle()
 	ta.SetHeight(inputHeight)
 	ta.Focus()
-	return model{channel: channel, user: user, room: room, input: ta, width: defaultWidth}
+
+	filter := textinput.New()
+	filter.Prompt = "> "
+	filter.Placeholder = "type to filter…"
+	filter.PromptStyle = promptStyle
+	filter.PlaceholderStyle = placeholderStyle
+
+	return model{channel: channel, user: user, room: room, input: ta, pickerFilter: filter, width: defaultWidth}
+}
+
+func filterEmoji(filter string) []emoji.Entry {
+	if filter == "" {
+		return emoji.All()
+	}
+	return emoji.Search(filter)
 }
 
 func (m model) Init() tea.Cmd {
@@ -196,6 +213,17 @@ func (m model) maxScrollOffset() int {
 	return max(0, len(m.lines)-m.visibleLines())
 }
 
+func (m model) pickerContentWidth() int {
+	return min(pickerMaxWidth, max(20, m.width-6))
+}
+
+func (m *model) closePicker() {
+	m.pickerActive = false
+	m.pickerResults = nil
+	m.pickerFilter.Blur()
+	m.pickerFilter.SetValue("")
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -204,6 +232,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.width = 32
 		}
 		m.input.SetWidth(m.width - 2)
+		m.pickerFilter.Width = m.pickerContentWidth() - 2 - lipgloss.Width(m.pickerFilter.Prompt)
 		m.height = msg.Height
 		m.scrollOffset = min(m.scrollOffset, m.maxScrollOffset())
 		return m, nil
@@ -222,8 +251,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case tea.KeyCtrlC:
 				return m, tea.Quit
 			case tea.KeyEsc:
-				m.pickerActive = false
-				m.pickerResults = nil
+				m.closePicker()
 				return m, nil
 			case tea.KeyUp:
 				if m.pickerIndex > 0 {
@@ -236,12 +264,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case tea.KeyEnter:
-				m.input.InsertString(m.pickerResults[m.pickerIndex].Char)
-				m.pickerActive = false
-				m.pickerResults = nil
+				if len(m.pickerResults) > 0 {
+					m.input.InsertString(m.pickerResults[m.pickerIndex].Char)
+				}
+				m.closePicker()
 				return m, nil
 			default:
-				return m, nil
+				var cmd tea.Cmd
+				m.pickerFilter, cmd = m.pickerFilter.Update(msg)
+				m.pickerResults = filterEmoji(m.pickerFilter.Value())
+				m.pickerIndex = 0
+				return m, cmd
 			}
 		}
 
@@ -273,7 +306,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					infoStyle.Render("  /rooms          list all rooms"),
 					infoStyle.Render("  /users          list users in the current room"),
 					infoStyle.Render("  /join <room>    switch to a different room"),
-					infoStyle.Render("  /emoji <query>  find an emoji to insert"),
+					infoStyle.Render("  /emoji          browse emojis to insert, then type to filter"),
 					infoStyle.Render("  /clear          clear the message log"),
 					infoStyle.Render("  /help           show this message"),
 					infoStyle.Render("  (anything else) send a message to the current room"),
@@ -281,22 +314,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case strings.HasPrefix(text, "/join "):
 				m.room = strings.TrimSpace(strings.TrimPrefix(text, "/join "))
 				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: m.room})
-			case text == "/emoji" || strings.HasPrefix(text, "/emoji "):
-				query := strings.TrimSpace(strings.TrimPrefix(text, "/emoji"))
-				results := emoji.Search(query)
-				switch {
-				case query == "":
-					m.lines = append(m.lines, errorStyle.Render("usage: /emoji <search term>"))
-				case len(results) == 0:
-					m.lines = append(m.lines, infoStyle.Render(fmt.Sprintf("no emoji found for %q", query)))
-				default:
-					if len(results) > maxEmojiResults {
-						results = results[:maxEmojiResults]
-					}
-					m.pickerActive = true
-					m.pickerResults = results
-					m.pickerIndex = 0
-				}
+			case text == "/emoji":
+				m.pickerActive = true
+				m.pickerResults = emoji.All()
+				m.pickerIndex = 0
+				m.pickerFilter.SetValue("")
+				m.pickerFilter.Focus()
 			default:
 				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: m.room, Body: text})
 			}
@@ -352,16 +375,31 @@ func (m model) View() string {
 }
 
 func (m model) pickerView() string {
-	rows := make([]string, 0, len(m.pickerResults)+1)
-	for i, e := range m.pickerResults {
-		row := fmt.Sprintf("%s  %s", e.Char, e.Description)
+	total := len(m.pickerResults)
+	visible := min(pickerVisibleRows, total)
+
+	start := m.pickerIndex - visible/2
+	start = max(0, min(start, total-visible))
+	end := start + visible
+
+	rows := make([]string, 0, visible+1)
+	for i := start; i < end; i++ {
+		e := m.pickerResults[i]
+		row := "  " + fmt.Sprintf("%s  %s", e.Char, e.Description)
 		if i == m.pickerIndex {
-			row = pickerSelectedStyle.Render("▶ " + row)
-		} else {
-			row = "  " + row
+			row = pickerSelectedStyle.Render(row)
 		}
 		rows = append(rows, row)
 	}
-	rows = append(rows, dimStyle.Render("↑↓ choose · enter insert · esc cancel"))
-	return pickerStyle.Render(strings.Join(rows, "\n"))
+	if total == 0 {
+		rows = append(rows, dimStyle.Render("no matches"))
+	}
+
+	footer := fmt.Sprintf("%d/%d · esc cancel", m.pickerIndex+1, total)
+	if total == 0 {
+		footer = "esc cancel"
+	}
+	rows = append(rows, dimStyle.Render(footer))
+	rows = append(rows, m.pickerFilter.View())
+	return pickerStyle.Width(m.pickerContentWidth()).Render(strings.Join(rows, "\n"))
 }
