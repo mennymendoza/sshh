@@ -51,6 +51,16 @@ var (
 	dimStyle   = lipgloss.NewStyle().Foreground(colorDim)
 	joinStyle  = lipgloss.NewStyle().Foreground(colorJoin)
 	leaveStyle = lipgloss.NewStyle().Foreground(colorLeave)
+
+	pickerStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorBorder).
+			Padding(0, 1)
+
+	pickerSelectedStyle = lipgloss.NewStyle().
+				Background(colorBorder).
+				Foreground(colorBadge).
+				Bold(true)
 )
 
 func userStyle(name string) lipgloss.Style {
