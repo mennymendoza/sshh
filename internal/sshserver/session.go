@@ -246,7 +246,7 @@ func (sess *session) handleHistory(msg protocol.ClientMessage) {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
 		return
 	}
-	messages, err := sess.server.db.ListMessages(roomRow.ID, page, pageSize)
+	messages, err := sess.server.db.ListMessages(roomRow.ID, msg.Sender, page, pageSize)
 	if err != nil {
 		sess.send(protocol.ServerMessage{Type: protocol.MsgError, Error: err.Error()})
 		return

@@ -28,7 +28,7 @@ func Run(addr, sender, room, keyPath string, asJSON bool, page, pageSize uint) e
 	defer client.Close()
 	defer channel.Close()
 
-	if err := writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgHistory, Room: room, Page: page, PageSize: pageSize}); err != nil {
+	if err := writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgHistory, Room: room, Sender: sender, Page: page, PageSize: pageSize}); err != nil {
 		return fmt.Errorf("request history: %w", err)
 	}
 
@@ -65,15 +65,6 @@ type decryptedEntry struct {
 
 func printHistory(priv *[32]byte, msg protocol.ServerMessage, sender string, asJSON bool) error {
 	entries := msg.Messages
-	if sender != "" {
-		filtered := entries[:0]
-		for _, entry := range entries {
-			if entry.Sender == sender {
-				filtered = append(filtered, entry)
-			}
-		}
-		entries = filtered
-	}
 
 	if !asJSON && len(entries) == 0 {
 		if sender != "" {

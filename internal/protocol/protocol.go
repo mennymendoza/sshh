@@ -31,6 +31,7 @@ type ClientMessage struct {
 	Room     string `json:"room,omitempty"`
 	Body     string `json:"body,omitempty"`
 	Quiet    bool   `json:"quiet,omitempty"`
+	Sender   string `json:"sender,omitempty"`
 	Page     uint   `json:"page,omitempty"`
 	PageSize uint   `json:"page_size,omitempty"`
 }
