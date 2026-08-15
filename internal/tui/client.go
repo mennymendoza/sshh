@@ -45,6 +45,8 @@ func RunOnce(addr, user, room, message string) error {
 	defer client.Close()
 	defer channel.Close()
 
+	message = emoji.Resolve(message)
+
 	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgJoin, Room: room, Quiet: true})
 	writeMessage(channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: room, Body: message})
 
@@ -307,6 +309,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					infoStyle.Render("  /users          list users in the current room"),
 					infoStyle.Render("  /join <room>    switch to a different room"),
 					infoStyle.Render("  /emoji          browse emojis to insert, then type to filter"),
+					infoStyle.Render("  :shortcode:     resolved to an emoji when the message is sent, e.g. :fire:"),
 					infoStyle.Render("  /clear          clear the message log"),
 					infoStyle.Render("  /help           show this message"),
 					infoStyle.Render("  (anything else) send a message to the current room"),
@@ -321,7 +324,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.pickerFilter.SetValue("")
 				m.pickerFilter.Focus()
 			default:
-				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: m.room, Body: text})
+				writeMessage(m.channel, protocol.ClientMessage{Type: protocol.MsgSend, Room: m.room, Body: emoji.Resolve(text)})
 			}
 			return m, nil
 		}
